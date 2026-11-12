@@ -6,7 +6,7 @@ Original extension code is licensed under GPL-3.0-only (see LICENSE).
 Algorithm attribution:
 ArcAnima/SnapRef, https://github.com/ArcAnima/SnapRef
 Apache License 2.0, upstream commit 1f7e606621052c11486c7aa5ccf6c2c12c2c5a3a.
-snapref_webui/attention.py, reference.py and conditioning.py adapt equations and
+snapref_webui/adapter.py, attention.py, reference.py and conditioning.py adapt equations and
 implementation from train/asym.py and comfyui_nodes/snapref/__init__.py.
 Changes: Neo interfaces; scoped hooks; CPU cache; exact CPU Fidelity behavior;
 OOM propagation; numerical rescale clamp; integration and validation tests.

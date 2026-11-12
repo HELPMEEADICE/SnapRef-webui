@@ -35,6 +35,7 @@ def main():
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--denoising", type=float, default=.1)
     parser.add_argument("--precision", default="bf16", choices=["bf16", "fp8"])
+    parser.add_argument("--megapixels", type=float, default=.25)
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     if args.checkpoint:
@@ -47,7 +48,7 @@ def main():
     report = []
     baseline = None
     for name in args.cases.split(","):
-        config = asdict(Config(enabled=True, megapixels=.25, precision=args.precision))
+        config = asdict(Config(enabled=True, megapixels=args.megapixels, precision=args.precision))
         payload = dict(prompt="1girl, solo, sitting on a bench, crossed legs, night, street, full body, detailed anime illustration",
                        negative_prompt="low quality, worst quality, blurry", seed=782341, steps=args.steps,
                        cfg_scale=args.cfg, distilled_cfg_scale=3.0, width=args.size, height=args.size,

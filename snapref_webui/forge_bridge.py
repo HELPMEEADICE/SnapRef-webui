@@ -92,6 +92,8 @@ def conflict_check(engine, unet, config):
     dm = unet.get_model_object("diffusion_model")
     if any("forward" in b.self_attn.__dict__ or "compute_attention" in b.self_attn.__dict__ for b in dm.blocks):
         raise SnapRefError("extension_conflict", detail="self_attn")
+    if getattr(dm.t_embedding_norm, "_anima_mod_delta", None) is not None or getattr(dm, "_anima_mod_block_state", None) is not None:
+        raise SnapRefError("extension_conflict", detail="Anima reference/target block modulation")
     if config.guidance_on and "model_function_wrapper" in unet.model_options:
         raise SnapRefError("guidance_conflict")
 

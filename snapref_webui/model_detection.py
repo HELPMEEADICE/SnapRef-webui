@@ -22,4 +22,8 @@ def detect_engine(engine):
     block_map(range(28), len(dm.blocks))
     if dm.patch_spatial != 2 or dm.patch_temporal != 1 or dm.out_channels != 16:
         raise SnapRefError("unsupported_structure")
+    for block in dm.blocks:
+        attn = block.self_attn
+        if block.x_dim != 2048 or (attn.n_heads, attn.head_dim) != (16, 128) or block.cross_attn.context_dim != 1024:
+            raise SnapRefError("unsupported_structure")
     return dm

@@ -48,6 +48,7 @@ def status(text):
 
 
 def prepare(p, config, refs, adapter):
+    from modules import shared
     from modules.prompt_parser import SdConditioning
     engine = p.sd_model
     forge = engine.forge_objects
@@ -55,6 +56,8 @@ def prepare(p, config, refs, adapter):
     images = [(resized(image, config.megapixels), weight) for image, weight in refs]
     key = digest([identity(dm), getattr(engine, "sd_model_hash", None), adapter.identity,
                   identity(forge.vae.first_stage_model), identity(forge.clip.cond_stage_model),
+                  str(getattr(forge.vae, "vae_dtype", None)), getattr(shared.opts, "emphasis", None),
+                  getattr(shared.opts, "CLIP_stop_at_last_layers", None),
                   str(forge.clip.patcher.patches_uuid), str(forge.unet.patches_uuid), config.mode,
                   config.caption, config.layout, [im.size for im, _ in images],
                   *[im.tobytes() for im, _ in images]])

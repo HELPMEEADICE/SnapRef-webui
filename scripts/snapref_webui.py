@@ -38,6 +38,8 @@ def capture(component, **kwargs):
     if elem_id == "img2img_tabs_resize":
         _components["resize_tabs"] = component
         _components["scale_index"] = _last_number
+    if elem_id == "img2img_tab_resize_by":
+        _components["resize_by_tab"] = component
     if elem_id in ("resize_mode", "img2img_denoising_strength"):
         _components[elem_id] = component
     if elem_id == "setting_sd_model_checkpoint":
@@ -124,6 +126,7 @@ class SnapRefScript(scripts.Script):
             preview = register(gr.Image(type="pil", sources=["upload", "clipboard"], label=text("preview"), interactive=True,
                                         height=320, elem_id="snapref_reference_image"), "preview")
             tab_active = gr.State(False)
+            previous_scale = gr.State(0)
             mode = register(gr.Radio(choice(["cs", "char"]), value="cs", label=text("mode")), "mode", choices=["cs", "char"])
             with gr.Row():
                 strength = register(gr.Slider(0, 2, value=1, step=.05, min_width=240, label=text("strength"), info=text("strength_info")), "strength", "strength_info")
@@ -186,18 +189,24 @@ class SnapRefScript(scripts.Script):
         use_main.change(lambda current, image: image if current else gr.skip(),
                         inputs=[use_main, _components["main"]], outputs=[preview], queue=False)
 
-        native_only = [_components[key] for key in ("resize_mode", "img2img_denoising_strength") if key in _components]
-        def enter_tab(value, current, main_image, own_image):
+        native_only = [_components[key] for key in ("resize_mode", "img2img_denoising_strength", "resize_by_tab") if key in _components]
+        def enter_tab(value, current, main_image, own_image, scale, previous, active):
             message, update = model_status(value)
             return [gr.update(value=update.get("interactive", False), interactive=update.get("interactive", False)), True, 0,
                     gr.update(selected="to"), 0, main_image if current else own_image, message,
+                    previous if active else scale,
                     *[gr.update(visible=False) for _ in native_only]]
-        panel.select(enter_tab, inputs=[lang, use_main, _components["main"], preview],
+        panel.select(enter_tab, inputs=[lang, use_main, _components["main"], preview, _components["scale_index"], previous_scale, tab_active],
                      outputs=[enabled, tab_active, _components["mode_index"], _components["resize_tabs"],
-                              _components["scale_index"], preview, state, *native_only], queue=False)
+                              _components["scale_index"], preview, state, previous_scale, *native_only], queue=False)
+        def leave_tab(previous, active):
+            if not active:
+                return [False, False, gr.skip(), gr.skip(), *[gr.skip() for _ in native_only]]
+            return [False, False, gr.update(selected="by" if previous else "to"), previous,
+                    *[gr.update(visible=True) for _ in native_only]]
         for native_tab in _components["native_tabs"]:
-            native_tab.select(lambda: [False, False, *[gr.update(visible=True) for _ in native_only]],
-                              outputs=[enabled, tab_active, *native_only], queue=False)
+            native_tab.select(leave_tab, inputs=[previous_scale, tab_active],
+                              outputs=[enabled, tab_active, _components["resize_tabs"], _components["scale_index"], *native_only], queue=False)
 
         def switch_language(value):
             nonlocal language
@@ -206,6 +215,8 @@ class SnapRefScript(scripts.Script):
             updates = []
             for component, key, info, choices, prop in labels:
                 kw = {prop: tr(key, value)}
+                if key == "title" and prop == "value":
+                    kw[prop] = "### " + kw[prop]
                 if info:
                     kw["info"] = tr(info, value)
                 if choices:

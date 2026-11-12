@@ -5,7 +5,7 @@
   "reference_tab_disabled": "Enable SnapRef in Reference Generation, or switch to the original img2img tab for ordinary image editing.",
   "title": "Character Reference Generation (SnapRef)",
   "enable": "Enable character reference generation",
-  "intro": "The img2img image is a character reference. Generate a new scene from fresh noise at the selected size; denoising strength is not used. Inpaint is unsupported. PNG Info restores settings; please select reference images again.",
+  "intro": "Upload a character reference here, or reuse the img2img main image with the option below. Generate a new scene from fresh noise at the selected size; denoising strength is not used. Direct uploads preserve the original canvas. Return to a native sub-tab for ordinary img2img or inpaint.",
   "use_main": "Use current img2img image as reference",
   "preview": "Character reference image (drop, paste or upload)",
   "extras": "Additional references (up to 8 total)",

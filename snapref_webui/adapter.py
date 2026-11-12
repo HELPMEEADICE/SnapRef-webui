@@ -1,4 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-only
+# Storage rules adapted from ArcAnima/SnapRef (Apache-2.0); modified for strict
+# branch coverage, dimension/finite validation and Windows mmap release.
 """SnapRef anima_ref_kv/1 storage, deliberately independent of Forge's LoRA loader."""
 import json
 import math
