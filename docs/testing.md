@@ -21,6 +21,10 @@ only this external extension plus the host's built-in extensions enabled.
 
 ## CPU unit tests
 
+GitHub Actions runs these tests on Windows and Linux with Python 3.13 and CPU
+PyTorch for pushes to `main` and pull requests. The live Forge checks are skipped
+without `SNAPREF_FORGE_URL`; CI does not run the GPU or real-checkpoint tests.
+
 ```text
 <host-python> -m unittest discover -s tests -v
 ```
