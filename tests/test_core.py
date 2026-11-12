@@ -37,7 +37,8 @@ def checkpoint(path, fp8=False, bad_scale=False):
                 else:
                     weights[root + name] = tensor.to(torch.bfloat16)
             weights[root + "alpha"] = torch.tensor(2.)
-    save_file(weights, str(path), metadata={"snapref": json.dumps({"format": "anima_ref_kv/1", "modes": ["cs", "char"], "ref_t": 10})})
+    save_file(weights, str(path), metadata={"snapref": json.dumps({"format": "anima_ref_kv/1", "modes": ["cs", "char"], "ref_t": 10,
+        "lora": {stream: {"rank": 2, "targets": ["self_attn.q_proj"]} for stream in ("ref", "tgt")}})})
 
 
 class TinyAttention(torch.nn.Module):
@@ -133,6 +134,10 @@ class AdapterTests(unittest.TestCase):
                     with hooks(dm, ad, state, Config(), {}):
                         raise RuntimeError("injected")
                 self.assertEqual(len(dm.blocks[0].self_attn.q_proj._forward_hooks), 0)
+                with hooks(dm, ad, state, Config(), {}):
+                    with self.assertRaises(SnapRefError):
+                        with hooks(dm, ad, state, Config(), {}):
+                            self.fail("Reentrant installation accepted")
 
     def test_record_then_target_reads_cache(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -251,6 +256,23 @@ class InputsAndTranslationTests(unittest.TestCase):
 
 
 class DownloadTests(unittest.TestCase):
+    def test_cancel_and_corrupt_transfer(self):
+        from snapref_webui.model_manager import download
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "models"
+            with self.assertRaises(SnapRefError) as caught:
+                download(root, "bf16", cancelled=lambda: True, attempts=1)
+            self.assertEqual(caught.exception.key, "cancelled")
+            source = Path(directory) / "bad.safetensors"
+            source.write_bytes(b"<html>error</html>")
+            info = SimpleNamespace(sha="revision", siblings=[SimpleNamespace(rfilename="snapref_v2a_pre2.safetensors", size=source.stat().st_size, lfs={"sha256": "0" * 64})])
+            with patch("huggingface_hub.HfApi") as api, patch("huggingface_hub.hf_hub_download", return_value=str(source)):
+                api.return_value.model_info.return_value = info
+                with self.assertRaises(SnapRefError):
+                    download(root, "bf16", attempts=1)
+            self.assertFalse(list(root.glob("*.safetensors")))
+            self.assertFalse(list(root.glob("*.part")))
+
     def test_failure_no_final_file_or_partial(self):
         from snapref_webui.model_manager import download
         with tempfile.TemporaryDirectory() as directory, patch("huggingface_hub.HfApi") as api:
@@ -273,6 +295,53 @@ class DownloadTests(unittest.TestCase):
                 self.assertEqual(dest.read_bytes(), source.read_bytes())
                 self.assertEqual(download(root, "bf16"), dest)
                 self.assertEqual(transfer.call_count, 1)
+
+
+class RequestLifecycleTests(unittest.TestCase):
+    class Processing:
+        def init(self, *args):
+            return "native_init"
+        def sample(self, *args):
+            return "native_sample"
+        def close(self):
+            self.closed = True
+
+    def test_disabled_does_not_patch_processing(self):
+        from snapref_webui.runtime import bind_request, CONFIG_FIELDS
+        p = self.Processing()
+        before = dict(p.__dict__)
+        bind_request(p, [False])
+        self.assertEqual(p.__dict__, before)
+        self.assertEqual(p.init(), "native_init")
+
+    def test_error_is_not_swallowed_and_close_restores(self):
+        from dataclasses import asdict
+        from snapref_webui.runtime import bind_request
+        p = self.Processing()
+        values = list(asdict(Config(enabled=True)).values()) + [[]]
+        bind_request(p, values)
+        with patch.dict("sys.modules", {"modules": SimpleNamespace(sd_samplers=SimpleNamespace())}), \
+             patch("snapref_webui.runtime.detect_engine", side_effect=SnapRefError("anima_only")):
+            p.sd_model = SimpleNamespace()
+            with self.assertRaises(SnapRefError):
+                p.init([], [], [])
+        p.close()
+        self.assertTrue(p.closed)
+        self.assertNotIn("init", p.__dict__)
+        self.assertNotIn("sample", p.__dict__)
+        self.assertNotIn("close", p.__dict__)
+        self.assertEqual(p.init(), "native_init")
+
+    def test_rebinding_does_not_stack_wrappers(self):
+        from dataclasses import asdict
+        from snapref_webui.runtime import bind_request
+        p = self.Processing()
+        values = list(asdict(Config(enabled=True)).values()) + [[]]
+        bind_request(p, values)
+        bind_request(p, values)
+        p.close()
+        self.assertNotIn("close", p.__dict__)
+        self.assertNotIn("_snapref_restore", p.__dict__)
 
 
 if __name__ == "__main__":

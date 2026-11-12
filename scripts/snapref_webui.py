@@ -101,10 +101,10 @@ class SnapRefScript(scripts.Script):
             enabled = register(gr.Checkbox(False, label=text("enable"), elem_id="snapref_enabled"), "enable")
             use_main = register(gr.Checkbox(True, label=text("use_main")), "use_main")
             preview = register(gr.Image(type="pil", label=text("preview"), interactive=False, height=200), "preview")
+            mode = register(gr.Radio(choice(["cs", "char"]), value="cs", label=text("mode")), "mode", choices=["cs", "char"])
             with gr.Row():
-                mode = register(gr.Radio(choice(["cs", "char"]), value="cs", label=text("mode")), "mode", choices=["cs", "char"])
-                strength = register(gr.Slider(0, 2, value=1, step=.05, label=text("strength"), info=text("strength_info")), "strength", "strength_info")
-                fidelity = register(gr.Slider(0, 1, value=1, step=.05, label=text("fidelity"), info=text("fidelity_info")), "fidelity", "fidelity_info")
+                strength = register(gr.Slider(0, 2, value=1, step=.05, min_width=240, label=text("strength"), info=text("strength_info")), "strength", "strength_info")
+                fidelity = register(gr.Slider(0, 1, value=1, step=.05, min_width=240, label=text("fidelity"), info=text("fidelity_info")), "fidelity", "fidelity_info")
             resolution = register(gr.Slider(.25, 2, value=1, step=.05, label=text("resolution"), info=text("resolution_info")), "resolution", "resolution_info")
             register(gr.Markdown(text("license_notice")), "license_notice", prop="value")
             with gr.Accordion(text("extras"), open=False) as extra_panel:
@@ -157,8 +157,11 @@ class SnapRefScript(scripts.Script):
                          inputs=[gallery, selected, upload, use_main], outputs=[gallery, selected, upload], queue=False)
         if "main" in _components:
             _components["main"].change(lambda image: image, inputs=[_components["main"]], outputs=[preview], queue=False)
+        use_main.change(lambda value: gr.update(visible=value), inputs=[use_main], outputs=[preview], queue=False)
 
         def switch_language(value):
+            nonlocal language
+            language = value
             save_preferences(language=value)
             updates = []
             for component, key, info, choices, prop in labels:
@@ -175,6 +178,10 @@ class SnapRefScript(scripts.Script):
             runtime.clear()
             return tr("cache_cleared", value)
         clear_cache.click(clear_cache_fn, inputs=[lang], outputs=[state], queue=False)
+        def enabled_changed(value):
+            if not value:
+                runtime.clear()
+        enabled.change(enabled_changed, inputs=[enabled], queue=False, show_progress="hidden")
         if "checkpoint" in _components:
             _components["checkpoint"].change(lambda _checkpoint, value: model_status(value), inputs=[_components["checkpoint"], lang], outputs=[state, enabled], queue=False)
         # Gradio root load handles initial selected checkpoint before model is loaded.

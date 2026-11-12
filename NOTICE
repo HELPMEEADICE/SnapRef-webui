@@ -1,0 +1,35 @@
+SnapRef-webui
+Copyright (C) 2026 SnapRef-webui contributors
+
+Original extension code is licensed under GPL-3.0-only (see LICENSE).
+
+Algorithm attribution:
+ArcAnima/SnapRef, https://github.com/ArcAnima/SnapRef
+Apache License 2.0, upstream commit 1f7e606621052c11486c7aa5ccf6c2c12c2c5a3a.
+snapref_webui/attention.py, reference.py and conditioning.py adapt equations and
+implementation from train/asym.py and comfyui_nodes/snapref/__init__.py.
+Changes: Neo interfaces; scoped hooks; CPU cache; exact CPU Fidelity behavior;
+OOM propagation; numerical rescale clamp; integration and validation tests.
+The upstream Apache license is preserved in licenses/Apache-2.0.txt. Upstream
+has no NOTICE file at this revision. Attribution is retained here and in the
+modified source files. Apache-2.0 permits redistribution under GPLv3 with these
+notices and license obligations preserved.
+
+Architecture research only:
+LeonWGal/anima-ref-adapter-neo, Apache-2.0, d856d1fe0f354d3ed3f6c739c2f68920accc3330.
+eduardoabreu81/anima-reference-forge-neo, AGPL-3.0, 40b925b47ea5a1c20554f0f54d29edd751939d25.
+No source code from these repositories is included in this distribution.
+
+Forge Neo is an external AGPL-3.0 host. This repository does not include or
+relicense Forge source. Its bridge calls the host's extension/model APIs. A
+combined distribution must also comply with the host's AGPL terms; GPL-only
+claims here concern this independent repository, not an aggregate WebUI product.
+Whether a particular combined work is derivative is a distribution-specific
+question; no exception from the host license is asserted.
+
+Pretrained SnapRef weights are NOT licensed under GPL or Apache. The author
+distributes them under CircleStone Labs Non-Commercial License v1.2. Obtain
+and review the actual license with the weights at:
+https://huggingface.co/0ppxnhximxr/snapref-v2a-pre2
+No pretrained weights or third-party sample/generated images are bundled.
+Not affiliated with or endorsed by CircleStone Labs.

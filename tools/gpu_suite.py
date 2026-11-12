@@ -28,8 +28,18 @@ def main():
     parser.add_argument("--size", type=int, default=512)
     parser.add_argument("--lora")
     parser.add_argument("--non-anima")
+    parser.add_argument("--checkpoint")
+    parser.add_argument("--cfg", type=float, default=4.5)
+    parser.add_argument("--sampler", default="Euler")
+    parser.add_argument("--scheduler", default="Simple")
+    parser.add_argument("--batch-size", type=int, default=1)
+    parser.add_argument("--denoising", type=float, default=.1)
+    parser.add_argument("--precision", default="bf16", choices=["bf16", "fp8"])
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
+    if args.checkpoint:
+        response = requests.post(args.url + "/sdapi/v1/options", json={"sd_model_checkpoint": args.checkpoint}, timeout=120)
+        response.raise_for_status()
     def encode(path):
         return base64.b64encode(path.read_bytes()).decode()
     ref = encode(args.reference)
@@ -37,18 +47,30 @@ def main():
     report = []
     baseline = None
     for name in args.cases.split(","):
-        config = asdict(Config(enabled=True, megapixels=.25))
+        config = asdict(Config(enabled=True, megapixels=.25, precision=args.precision))
         payload = dict(prompt="1girl, solo, sitting on a bench, crossed legs, night, street, full body, detailed anime illustration",
                        negative_prompt="low quality, worst quality, blurry", seed=782341, steps=args.steps,
-                       cfg_scale=4.5, distilled_cfg_scale=3.0, width=args.size, height=args.size,
-                       sampler_name="Euler", scheduler="Simple", batch_size=1, n_iter=1,
+                       cfg_scale=args.cfg, distilled_cfg_scale=3.0, width=args.size, height=args.size,
+                       sampler_name=args.sampler, scheduler=args.scheduler, batch_size=args.batch_size, n_iter=1,
                        save_images=False, send_images=True)
         endpoint = "/sdapi/v1/img2img"
         extras = []
         if name in ("baseline", "restored"):
             endpoint = "/sdapi/v1/txt2img"
         else:
-            payload.update(init_images=[ref], denoising_strength=.1)
+            payload.update(init_images=[ref], denoising_strength=args.denoising)
+            if name in ("native_before", "native_after"):
+                config["enabled"] = False
+            if name == "strength_zero":
+                config["strength"] = 0.
+            if name == "stitch":
+                extras = [ref2]
+                config["layout"] = "stitch"
+            if name == "three":
+                extras = [ref2, ref]
+                config["weights"] = "1,0.5,0.2"
+            if name == "in_uncond":
+                config["in_uncond"] = True
             if name == "switch":
                 payload["init_images"] = [ref2]
             if name == "char":
@@ -83,6 +105,8 @@ def main():
                 continue
             raise RuntimeError(response.text)
         result = response.json()
+        if len(result["images"]) < args.batch_size:
+            raise AssertionError("Missing batch outputs")
         data = base64.b64decode(result["images"][0])
         image = Image.open(io.BytesIO(data)).convert("RGB")
         image.save(args.output / f"{name}.png")

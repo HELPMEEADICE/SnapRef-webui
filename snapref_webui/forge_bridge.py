@@ -3,6 +3,7 @@
 import logging
 import math
 import threading
+import weakref
 from contextlib import contextmanager
 from dataclasses import dataclass
 
@@ -17,6 +18,7 @@ from .reference import encode_reference
 
 LOCK = threading.RLock()
 log = logging.getLogger("snapref")
+_HOOKED = weakref.WeakSet()
 
 
 @dataclass
@@ -32,7 +34,10 @@ class ForwardState:
 def hooks(dm, adapter, state, config, device_weights):
     """Resolve before mutating, remove every handle and restore exact attribute ownership."""
     targets = adapter.resolve(dm)
+    if dm in _HOOKED:
+        raise SnapRefError("extension_conflict", detail="SnapRef reentrant hook installation")
     saved, handles = [], []
+    _HOOKED.add(dm)
     try:
         for module, streams in targets:
             def delta(mod, args, out, _streams=streams):
@@ -72,6 +77,7 @@ def hooks(dm, adapter, state, config, device_weights):
                 setattr(obj, attr, value)
             else:
                 delattr(obj, attr)
+        _HOOKED.discard(dm)
 
 
 def conflict_check(engine, unet, config):

@@ -37,7 +37,7 @@ def select_references(main, extra, config):
         weights = [float(x.strip()) for x in config.weights.split(",") if x.strip()]
     except ValueError as exc:
         raise SnapRefError("bad_weights") from exc
-    if not weights or any(not math.isfinite(w) or not 0 <= w <= 2 for w in weights):
+    if not weights or len(weights) > 8 or any(not math.isfinite(w) or not 0 <= w <= 2 for w in weights):
         raise SnapRefError("bad_weights")
     weights += [1.0] * max(0, len(items) - len(weights))
     refs = [(image_from_input(image), weight) for image, weight in zip(items, weights) if image is not None and weight > 0]

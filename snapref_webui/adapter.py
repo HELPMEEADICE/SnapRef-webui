@@ -49,6 +49,21 @@ def inspect_file(path):
         with safe_open(str(path), framework="pt", device="cpu") as handle:
             meta = metadata(handle)
             keys = set(handle.keys())
+            declared = meta.get("lora", {})
+            expected = set()
+            for stream in ("ref", "tgt"):
+                spec = declared.get(stream, {})
+                if not isinstance(spec.get("rank"), int) or spec["rank"] < 1 or not spec.get("targets"):
+                    raise SnapRefError("bad_adapter", detail=f"metadata lora.{stream}")
+                for index in range(28):
+                    for target in spec["targets"]:
+                        name = f"blocks.{index}.{target}"
+                        if not TARGET.fullmatch(name):
+                            raise SnapRefError("bad_adapter", detail=name)
+                        expected.add(f"{PREFIX}{stream}.{name}.lora_down")
+            actual = {key for key in keys if key.endswith(".lora_down")}
+            if expected != actual:
+                raise SnapRefError("bad_adapter", detail="metadata/tensor target coverage mismatch")
             branches = {s: set() for s in ("ref", "tgt")}
             for key in keys:
                 if not key.endswith(".lora_down"):
@@ -59,6 +74,11 @@ def inspect_file(path):
                 stem = key[:-len("lora_down")]
                 if not {stem + "lora_up", stem + "alpha"} <= keys:
                     raise SnapRefError("bad_adapter", detail=stem)
+                down_shape = handle.get_slice(key).get_shape()
+                up_shape = handle.get_slice(stem + "lora_up").get_shape()
+                rank = declared[stream]["rank"]
+                if len(down_shape) != 2 or len(up_shape) != 2 or down_shape[0] != rank or up_shape[1] != rank:
+                    raise SnapRefError("bad_adapter", detail=stem + " rank")
                 branches[stream].add(int(name.split(".")[1]))
             if any(indices != set(range(28)) for indices in branches.values()):
                 raise SnapRefError("bad_adapter", detail="ref/tgt blocks != 0..27")

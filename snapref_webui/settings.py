@@ -48,6 +48,9 @@ class Config:
 
     def validate(self):
         from .i18n import SnapRefError
+        for name in ("enabled", "use_main", "in_uncond", "guidance_on"):
+            if not isinstance(getattr(self, name), bool):
+                raise SnapRefError("invalid_parameter", name=name, value=getattr(self, name))
         enums = {"mode": ("cs", "char"), "layout": ("separate", "stitch"),
                  "correction": ("apg", "rescale", "none"), "precision": ("bf16", "fp8"),
                  "language": ("zh-CN", "ja-JP", "en")}
