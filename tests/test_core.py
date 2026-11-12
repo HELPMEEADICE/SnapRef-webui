@@ -343,6 +343,20 @@ class RequestLifecycleTests(unittest.TestCase):
         self.assertNotIn("close", p.__dict__)
         self.assertNotIn("_snapref_restore", p.__dict__)
 
+    def test_disabled_reference_tab_cannot_fall_back_to_img2img(self):
+        from dataclasses import asdict
+        from snapref_webui.runtime import bind_request
+        p = self.Processing()
+        p.sd_model = SimpleNamespace()
+        values = list(asdict(Config(enabled=False)).values()) + [[], None, True]
+        bind_request(p, values)
+        with patch.dict("sys.modules", {"modules": SimpleNamespace(sd_samplers=SimpleNamespace())}), \
+             patch("snapref_webui.runtime.detect_engine"):
+            with self.assertRaises(SnapRefError) as caught:
+                p.init([], [], [])
+            self.assertEqual(caught.exception.key, "reference_tab_disabled")
+        p.close()
+
 
 if __name__ == "__main__":
     unittest.main()

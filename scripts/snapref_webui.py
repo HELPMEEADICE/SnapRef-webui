@@ -19,11 +19,27 @@ from snapref_webui.settings import Config, save_preferences
 
 _components = {}
 _main_pending = False
+_last_number = None
 
 
 def capture(component, **kwargs):
-    global _main_pending
+    global _main_pending, _last_number
     elem_id = getattr(component, "elem_id", None)
+    if isinstance(component, gr.Number):
+        _last_number = component
+        if getattr(component, "parent", None) is _components.get("img_tabs"):
+            _components["mode_index"] = component
+    if elem_id == "mode_img2img":
+        _components["img_tabs"] = component
+        _components["native_tabs"] = []
+    if elem_id in {"img2img_img2img_tab", "img2img_img2img_sketch_tab", "img2img_inpaint_tab",
+                    "img2img_inpaint_sketch_tab", "img2img_inpaint_upload_tab", "img2img_batch_tab"}:
+        _components.setdefault("native_tabs", []).append(component)
+    if elem_id == "img2img_tabs_resize":
+        _components["resize_tabs"] = component
+        _components["scale_index"] = _last_number
+    if elem_id in ("resize_mode", "img2img_denoising_strength"):
+        _components[elem_id] = component
     if elem_id == "setting_sd_model_checkpoint":
         _components["checkpoint"] = component
     if elem_id == "img2img_image":
@@ -76,6 +92,7 @@ def model_status(language):
 
 class SnapRefScript(scripts.Script):
     sorting_priority = 530
+    create_group = False
 
     def title(self):
         return tr("plugin_name", "en")
@@ -93,14 +110,20 @@ class SnapRefScript(scripts.Script):
             return tr(key, language)
         def choice(keys):
             return [(text(key), key) for key in keys]
-        with gr.Accordion(text("title"), open=False, elem_id="snapref_panel") as panel:
-            register(panel, "title")
+        required = {"img_tabs", "mode_index", "main", "resize_tabs", "scale_index"}
+        if not required <= _components.keys():
+            raise SnapRefError("ui_entry_missing")
+        with _components["img_tabs"], gr.TabItem(text("tab_title"), id="snapref", elem_id="img2img_snapref_tab") as panel:
+            register(panel, "tab_title")
+            register(gr.Markdown("### " + text("title")), "title", prop="value")
             register(gr.Markdown(text("intro")), "intro", prop="value")
             lang = register(gr.Dropdown(choices=[("简体中文", "zh-CN"), ("日本語", "ja-JP"), ("English", "en")], value=language, label=text("language")), "language")
             state = gr.Markdown("")
             enabled = register(gr.Checkbox(False, label=text("enable"), elem_id="snapref_enabled"), "enable")
             use_main = register(gr.Checkbox(True, label=text("use_main")), "use_main")
-            preview = register(gr.Image(type="pil", label=text("preview"), interactive=False, height=200), "preview")
+            preview = register(gr.Image(type="pil", sources=["upload", "clipboard"], label=text("preview"), interactive=True,
+                                        height=320, elem_id="snapref_reference_image"), "preview")
+            tab_active = gr.State(False)
             mode = register(gr.Radio(choice(["cs", "char"]), value="cs", label=text("mode")), "mode", choices=["cs", "char"])
             with gr.Row():
                 strength = register(gr.Slider(0, 2, value=1, step=.05, min_width=240, label=text("strength"), info=text("strength_info")), "strength", "strength_info")
@@ -155,9 +178,26 @@ class SnapRefScript(scripts.Script):
         for button, operation in ((add, "add"), (replace, "replace"), (delete, "delete"), (left, "left"), (right, "right")):
             button.click(lambda items, index, image, current, op=operation: edit(items, index, image, op, current),
                          inputs=[gallery, selected, upload, use_main], outputs=[gallery, selected, upload], queue=False)
-        if "main" in _components:
-            _components["main"].change(lambda image: image, inputs=[_components["main"]], outputs=[preview], queue=False)
-        use_main.change(lambda value: gr.update(visible=value), inputs=[use_main], outputs=[preview], queue=False)
+        # Main canvas is read-only from this extension. A local upload becomes an
+        # independent primary reference, without replacing the user's img2img image.
+        _components["main"].change(lambda image, current: image if current else gr.skip(),
+                                    inputs=[_components["main"], use_main], outputs=[preview], queue=False)
+        preview.input(lambda _image: False, inputs=[preview], outputs=[use_main], queue=False)
+        use_main.change(lambda current, image: image if current else gr.skip(),
+                        inputs=[use_main, _components["main"]], outputs=[preview], queue=False)
+
+        native_only = [_components[key] for key in ("resize_mode", "img2img_denoising_strength") if key in _components]
+        def enter_tab(value, current, main_image, own_image):
+            message, update = model_status(value)
+            return [gr.update(value=update.get("interactive", False), interactive=update.get("interactive", False)), True, 0,
+                    gr.update(selected="to"), 0, main_image if current else own_image, message,
+                    *[gr.update(visible=False) for _ in native_only]]
+        panel.select(enter_tab, inputs=[lang, use_main, _components["main"], preview],
+                     outputs=[enabled, tab_active, _components["mode_index"], _components["resize_tabs"],
+                              _components["scale_index"], preview, state, *native_only], queue=False)
+        for native_tab in _components["native_tabs"]:
+            native_tab.select(lambda: [False, False, *[gr.update(visible=True) for _ in native_only]],
+                              outputs=[enabled, tab_active, *native_only], queue=False)
 
         def switch_language(value):
             nonlocal language
@@ -189,7 +229,7 @@ class SnapRefScript(scripts.Script):
         Context.root_block.load(model_status, inputs=[lang], outputs=[state, enabled], queue=False)
 
         controls = [enabled, use_main, mode, strength, fidelity, resolution, layout, weights, in_uncond,
-                    guidance_on, guidance, correction, guidance_end, caption, log_bias, precision, lang, gallery]
+                    guidance_on, guidance, correction, guidance_end, caption, log_bias, precision, lang, gallery, preview, tab_active]
         def restore_field(key):
             def get_value(params):
                 try:
@@ -198,6 +238,8 @@ class SnapRefScript(scripts.Script):
                     return gr.skip()
             return get_value
         self.infotext_fields = [(component, restore_field(key)) for component, key in zip(controls, runtime.CONFIG_FIELDS)]
+        self.infotext_fields.append((_components["img_tabs"], lambda params:
+            gr.update(selected="snapref") if params.get("SnapRef") in (True, "True") else gr.skip()))
         self.paste_field_names = ["SnapRef", "SnapRef Config", "SnapRef Adapter"]
         return controls
 

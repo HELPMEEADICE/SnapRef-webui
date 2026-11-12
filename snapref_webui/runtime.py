@@ -11,7 +11,7 @@ import torch
 
 from .cache import CACHE, digest
 from .forge_bridge import LOCK, conflict_check, sampling_transaction
-from .i18n import CURRENT, SnapRefError
+from .i18n import CURRENT, LANGUAGES, SnapRefError
 from .model_detection import detect_engine
 from .model_manager import ensure_adapter, release
 from .reference import encode_image, resized, select_references
@@ -56,7 +56,7 @@ def prepare(p, config, refs, adapter):
     key = digest([identity(dm), getattr(engine, "sd_model_hash", None), adapter.identity,
                   identity(forge.vae.first_stage_model), identity(forge.clip.cond_stage_model),
                   str(forge.clip.patcher.patches_uuid), str(forge.unet.patches_uuid), config.mode,
-                  config.caption, config.layout, [(im.size, w) for im, w in images],
+                  config.caption, config.layout, [im.size for im, _ in images],
                   *[im.tobytes() for im, _ in images]])
     if _prepared.get("key") != key:
         _prepared.clear()
@@ -73,7 +73,8 @@ def bind_request(p, values):
     """Called by Script.process; all fallible work is deferred into p.init/sample."""
     if hasattr(p, "_snapref_restore"):
         p._snapref_restore()
-    if not values or not values[0]:
+    tab_active = len(values) > len(CONFIG_FIELDS) + 2 and values[len(CONFIG_FIELDS) + 2]
+    if not values or (not values[0] and not tab_active):
         clear()
         return
     originals = {name: (name in p.__dict__, p.__dict__.get(name)) for name in ("init", "sample", "close")}
@@ -91,17 +92,23 @@ def bind_request(p, values):
     def init(this, all_prompts, all_seeds, all_subseeds):
         from modules import sd_samplers
         cfg = Config(**dict(zip(CONFIG_FIELDS, values[:len(CONFIG_FIELDS)])))
-        token = CURRENT.set(cfg.language)
+        token = CURRENT.set(cfg.language if cfg.language in LANGUAGES else "en")
         try:
             cfg.validate()
             detect_engine(this.sd_model)
+            if not cfg.enabled:
+                raise SnapRefError("reference_tab_disabled")
             if this.image_mask is not None or this.latent_mask is not None:
                 raise SnapRefError("inpaint_unsupported")
             if getattr(this, "enable_hr", False) or this.refiner_checkpoint_info is not None:
                 raise SnapRefError("hires_unsupported")
             conflict_check(this.sd_model, this.sd_model.forge_objects.unet, cfg)
             main = (this.init_images or [None])[0]
-            refs = select_references(main, values[len(CONFIG_FIELDS)] if len(values) > len(CONFIG_FIELDS) else [], cfg)
+            extra = list(values[len(CONFIG_FIELDS)] or []) if len(values) > len(CONFIG_FIELDS) else []
+            dedicated = values[len(CONFIG_FIELDS) + 1] if len(values) > len(CONFIG_FIELDS) + 1 else None
+            if not cfg.use_main and dedicated is not None:
+                extra.insert(0, dedicated)
+            refs = select_references(main, extra, cfg)
             request.update(config=cfg, refs=refs)
             this.sampler = sd_samplers.create_sampler(this.sampler_name, this.sd_model)
             this.image_cfg_scale = None
