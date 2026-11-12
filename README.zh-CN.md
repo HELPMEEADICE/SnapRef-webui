@@ -16,8 +16,14 @@ Anima 模型及匹配的 Qwen 文本编码器、Qwen Image VAE。实测环境为
 PyTorch 2.9.1+cu130、Gradio **4.40.0**、SageAttention 2.2、RTX 5080 Laptop 16GB。
 请使用 WebUI 自带的 Python 环境。
 
-将本独立仓库放入 `extensions/SnapRef-webui`，然后重启 WebUI。发布到远程 Git
-仓库后，也可在扩展页通过该仓库 URL 安装。`install.py` 只补装缺失依赖，不替换
+在扩展页「从网址安装」中填写 `https://github.com/HELPMEEADICE/SnapRef-webui.git`，
+安装后重启 WebUI。也可在 WebUI 根目录执行：
+
+```sh
+git clone https://github.com/HELPMEEADICE/SnapRef-webui.git extensions/SnapRef-webui
+```
+
+`install.py` 只补装缺失依赖，不替换
 Torch/Gradio，不修改 WebUI 源码，启动时不下载权重。
 
 ## 最简使用路径
@@ -134,7 +140,7 @@ python tools/compatibility_probe.py --reference 参考图绝对路径 --output �
 
 GPU 测试需先启动隔离配置的 Forge `--api --port 7862`；测试客户端可能改变该测试实例
 的模型选择，请勿指向他人正在使用的实例。完整命令与结果见 [测试报告](docs/testing.md)。
-发布后可在扩展独立仓库内 `git pull` 更新。卸载时先关闭 WebUI，再只删除
+可在扩展独立仓库内 `git pull` 或通过 Forge 扩展管理页更新。卸载时先关闭 WebUI，再只删除
 `extensions/SnapRef-webui`。模型文件保留，可由用户另行删除。插件不会删除共享模型、
 用户配置或主程序文件。
 

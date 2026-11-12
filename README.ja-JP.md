@@ -17,8 +17,14 @@ K/V キャッシュを実際に実行します。
 Python 3.13.11、PyTorch 2.9.1+cu130、Gradio **4.40.0**、SageAttention 2.2、
 RTX 5080 Laptop 16GB です。WebUI の Python 環境を使用してください。
 
-この独立リポジトリを `extensions/SnapRef-webui` に配置して再起動します。
-公開後は拡張機能の URL インストールも利用できます。`install.py` は不足依存のみ
+拡張機能の URL インストールに `https://github.com/HELPMEEADICE/SnapRef-webui.git`
+を入力してインストールし、WebUI を再起動します。または WebUI のルートで実行します。
+
+```sh
+git clone https://github.com/HELPMEEADICE/SnapRef-webui.git extensions/SnapRef-webui
+```
+
+`install.py` は不足依存のみ
 追加し、Torch/Gradio の交換やホストソースの変更、起動時の重み取得は行いません。
 
 ## 基本操作
@@ -141,8 +147,8 @@ python tools/compatibility_probe.py --reference 画像の絶対パス --output �
 
 GPU テストには隔離設定の Forge `--api --port 7862` が必要です。テスト対象インスタンスの
 モデル選択を変更する場合があるため、他の利用者の作業中インスタンスには向けないでください。
-詳細は[テスト報告](docs/testing.md)を参照してください。公開後の更新は独立リポジトリで
-`git pull` します。削除時は WebUI を停止し、`extensions/SnapRef-webui` のみ削除します。
+詳細は[テスト報告](docs/testing.md)を参照してください。更新は独立リポジトリで
+`git pull` するか Forge の拡張管理を使います。削除時は WebUI を停止し、`extensions/SnapRef-webui` のみ削除します。
 重みはモデルフォルダーに残り、必要なら別途削除できます。ホストや共有モデル、設定を削除しません。
 
 ## ライセンス

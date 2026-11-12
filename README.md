@@ -17,9 +17,14 @@ an Anima checkpoint, the matching Qwen text encoder and Qwen image VAE. Tested
 with Python 3.13.11, PyTorch 2.9.1+cu130, Gradio **4.40.0**, SageAttention 2.2,
 and an RTX 5080 Laptop GPU (16 GB). Use the host's Python environment.
 
-Place this independent repository at `extensions/SnapRef-webui` and restart
-WebUI. When this repository has been published, its Git URL can also be used
-in Extensions → Install from URL. No host source patch is required. Missing
+In Extensions → Install from URL, enter `https://github.com/HELPMEEADICE/SnapRef-webui.git`
+and restart WebUI. Alternatively, run from the WebUI root:
+
+```sh
+git clone https://github.com/HELPMEEADICE/SnapRef-webui.git extensions/SnapRef-webui
+```
+
+No host source patch is required. Missing
 Python dependencies are installed by `install.py`; Torch/Gradio are not replaced.
 
 ## Use
@@ -163,8 +168,8 @@ Start an isolated Forge `--api --port 7862` instance first for GPU tests. See
 The GPU clients make requests and can change **that test server's** selected
 checkpoint. Do not point them at another user's active generation session.
 
-Update with `git pull` inside this independent extension repository once it has
-an upstream remote. To uninstall, stop WebUI and remove only `extensions/SnapRef-webui`.
+Update with `git pull` inside this independent extension repository or use Forge's
+Extensions update controls. To uninstall, stop WebUI and remove only `extensions/SnapRef-webui`.
 Optional model files remain in your model folder and can be removed separately.
 No host source, shared model, or user setting is deleted by the extension.
 
