@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+*.safetensors
+*.ckpt
+*.gguf
+*.part
+*.lock
+settings.json
+test-results/
+.venv/
+dist/
