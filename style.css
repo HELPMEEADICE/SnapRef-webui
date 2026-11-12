@@ -1,0 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+#snapref_panel { min-width: 0; }
+#snapref_panel .gradio-gallery, #snapref_panel .gradio-row { min-width: 0; }
+#snapref_panel .prose { overflow-wrap: anywhere; }
