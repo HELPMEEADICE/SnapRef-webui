@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 import json
 import logging
+import time
 import uuid
 import weakref
 from dataclasses import fields
@@ -104,7 +105,11 @@ def bind_request(p, values):
             request.update(config=cfg, refs=refs)
             this.sampler = sd_samplers.create_sampler(this.sampler_name, this.sd_model)
             this.image_cfg_scale = None
-            this.init_latent = None
+            from modules import processing
+            # Forge hashes init_latent when caching img2img text conditions. A blank
+            # target canvas satisfies that contract; it is never passed to sample_img2img.
+            this.init_latent = torch.zeros(this.batch_size, 16, 1, this.height // processing.opt_f,
+                                           this.width // processing.opt_f, dtype=torch.float32)
             this.mask = this.nmask = None
             this.overlay_images = this.color_corrections = None
             this.paste_to = None
@@ -135,8 +140,17 @@ def bind_request(p, values):
                                                 "SnapRef Adapter": adapter.path.name, "SnapRef Adapter Step": adapter.meta.get("step", "unknown"),
                                                 "SnapRef Adapter Identity": str(adapter.identity), "SnapRef Model": this.sd_model_name,
                                                 "SnapRef References": len(request["refs"])})
+            hits = CACHE.hits
+            started = time.perf_counter()
+            if torch.cuda.is_available():
+                torch.cuda.reset_peak_memory_stats()
             with sampling_transaction(this.sd_model, adapter, latents, context, weights, cfg, key, interrupted):
-                return this.sampler.sample(this, noise, conditioning, unconditional_conditioning, image_conditioning=this.txt2img_image_conditioning(noise))
+                result = this.sampler.sample(this, noise, conditioning, unconditional_conditioning, image_conditioning=this.txt2img_image_conditioning(noise))
+            this.extra_generation_params["SnapRef Cache"] = "hit" if CACHE.hits > hits else "miss"
+            this.extra_generation_params["SnapRef Sampling Seconds"] = round(time.perf_counter() - started, 3)
+            if torch.cuda.is_available():
+                this.extra_generation_params["SnapRef Peak VRAM MiB"] = round(torch.cuda.max_memory_allocated() / 1024**2, 1)
+            return result
         except torch.cuda.OutOfMemoryError as exc:
             clear()
             raise SnapRefError("oom") from exc

@@ -39,7 +39,8 @@ def read_matrix(handle, key):
         raise SnapRefError("bad_adapter", detail=str(value.dtype))
     if not torch.isfinite(value).all():
         raise SnapRefError("bad_adapter", detail=key)
-    return value.to(torch.bfloat16)
+    # Detach from safetensors mmap: Windows must allow adapter replacement/uninstall.
+    return value.to(torch.bfloat16).clone()
 
 
 def inspect_file(path):
@@ -78,7 +79,7 @@ class Adapter:
         self.identity = (str(self.path), stat.st_mtime_ns, stat.st_size)
         self.weights = {}
         with safe_open(str(path), framework="pt", device="cpu") as handle:
-            self.mode_embed = handle.get_tensor(PREFIX + "mode_embed").float()
+            self.mode_embed = handle.get_tensor(PREFIX + "mode_embed").float().clone()
             if self.mode_embed.ndim != 2 or self.mode_embed.shape[0] != len(self.meta["modes"]) or not torch.isfinite(self.mode_embed).all():
                 raise SnapRefError("bad_adapter", detail="mode_embed shape / finite")
             for key in handle.keys():
