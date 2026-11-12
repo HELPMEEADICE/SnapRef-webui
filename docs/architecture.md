@@ -55,6 +55,17 @@ Disabled requests are untouched. Script callbacks swallow exceptions in this
 host, so all critical validation runs inside bound init/sample and aborts the
 request instead of falling back to ordinary img2img.
 
+The final UI is a native TabItem beside img2img/Sketch/Inpaint/Batch, added by
+re-entering the captured mode_img2img Tabs context during script UI creation.
+The script has create_group=False, so no bottom script group or accordion is
+created. Tab selection uses the existing native mode-0 transport and requests
+fresh-noise processing through this script. The dedicated primary image is an
+additional script argument; it does not overwrite the original img2img canvas.
+Selecting a native tab disables SnapRef for that session and restores native
+controls. The new tab selects Resize to; a disabled Reference Generation tab
+fails explicitly rather than falling back to ordinary img2img. No global JS
+submit function or host source is replaced. See docs/API.md for argument order.
+
 Clone the final UnetPatcher after normal LoRA activation and other sampling
 callbacks. Add an object patch for diffusion_model.forward only. Inside that
 forward, scoped hooks apply ref/tgt deltas and attention; finally removes all
